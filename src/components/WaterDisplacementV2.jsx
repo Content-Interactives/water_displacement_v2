@@ -137,11 +137,21 @@ function DraggableItem({ id, def }) {
 		position: 'absolute', 
 		left: leftValue, 
 		top: def.startY || 0,
-		transform: def.deltaX ? `translateX(${def.deltaX}px)` : undefined
+		transform: def.deltaX ? `translateX(${def.deltaX}px)` : undefined,
+		touchAction: 'none', // Prevent browser touch behaviors
+		userSelect: 'none',  // Prevent text selection on touch
+		WebkitUserSelect: 'none', // Safari specific
+		WebkitTouchCallout: 'none' // Disable callout on iOS
 	};
 	const style = transform ? { ...base, transform: `translate3d(${transform.x}px, ${transform.y}px, 0) ${def.deltaX ? `translateX(${def.deltaX}px)` : ''}` } : base;
 	return (
-		<div ref={setNodeRef} {...listeners} {...attributes} style={style} className="cursor-grab active:cursor-grabbing">
+		<div 
+			ref={setNodeRef} 
+			{...listeners} 
+			{...attributes} 
+			style={style} 
+			className="cursor-grab active:cursor-grabbing"
+		>
 			<RenderObjectAppearance type={def.type} size={def.size} color={def.color} />
 		</div>
 	);
@@ -178,8 +188,8 @@ const WaterDisplacementV2 = () => {
 		}),
 		useSensor(TouchSensor, { 
 			activationConstraint: { 
-				distance: 4,
-				tolerance: 5 // Additional tolerance for touch devices
+				delay: 100, // Add delay to distinguish from scrolling
+				tolerance: 8  // Increased tolerance for touch devices
 			} 
 		})
 	);
@@ -490,7 +500,7 @@ const WaterDisplacementV2 = () => {
 				</div>
 
 				{/* Objects (individually placed) */}
-				<div className='absolute top-[25%] right-[0%] w-[50%] h-[140px] relative z-[3]'>
+				<div className='absolute top-[25%] right-[0%] w-[50%] h-[140px] relative z-[3]' style={{ touchAction: 'none' }}>
 					{/* Original position objects */}
 					{allObjectIds.filter(id => onShelfIds.has(id)).map(id => (
 						<DraggableItem key={id} id={id} def={objectCatalog[id]} />
@@ -519,7 +529,7 @@ const WaterDisplacementV2 = () => {
 							/>
 						</div>
 					))}
-			</div>
+				</div>
 
 			{/* Flexi Prompt */}
 			<FlexiText text="Water Displacement">
