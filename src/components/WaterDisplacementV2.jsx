@@ -19,7 +19,7 @@ import './ui/reused-animations/fade.css';
 import './ui/reused-animations/scale.css';
 import './ui/reused-animations/glow.css';
 
-import { DndContext, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, PointerSensor, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 
 function RenderObjectAppearance({ type, size, color, isSubmerged = false }) {
 	const getBaseShape = () => {
@@ -169,7 +169,20 @@ const WaterDisplacementV2 = () => {
 	useEffect(() => { waterBodyPositionRef.current = waterBodyPosition; }, [waterBodyPosition]);
 
 	// DnD and physics state
-	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+	const sensors = useSensors(
+		useSensor(PointerSensor, { 
+			activationConstraint: { distance: 4 } 
+		}),
+		useSensor(MouseSensor, { 
+			activationConstraint: { distance: 4 } 
+		}),
+		useSensor(TouchSensor, { 
+			activationConstraint: { 
+				distance: 4,
+				tolerance: 5 // Additional tolerance for touch devices
+			} 
+		})
+	);
 	const { setNodeRef: setBeakerNodeRef } = useDroppable({ id: 'beaker' });
 	const beakerRef = useRef(null);
 	const [onShelfIds, setOnShelfIds] = useState(new Set(allObjectIds));
