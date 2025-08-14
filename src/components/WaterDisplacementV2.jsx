@@ -7,6 +7,7 @@ import FlexiThumbsUp from '../assets/All Flexi Poses/PNG/Flexi_ThumbsUp.png';
 import FlexiStars from '../assets/All Flexi Poses/PNG/Flexi_Stars.png';
 import FlexiExcited from '../assets/All Flexi Poses/PNG/Flexi_Excited.png';
 import FlexiTelescope from '../assets/All Flexi Poses/PNG/Flexi_Telescope.png';
+import FlexiWave from '../assets/All Flexi Poses/PNG/Flexi_Wave.png';
 
 // UI Components Imports
 import { Container } from './ui/reused-ui/Container.jsx'
@@ -92,6 +93,16 @@ function RenderObjectAppearance({ type, size, color, isSubmerged = false }) {
 				<div className="" style={{ width: size, height: size * 0.7, backgroundColor: color, borderRadius: '40% 50% 35% 55% / 50% 40% 60% 45%' }}></div>
 			);
 		}
+		if (type === 'flexi') {
+			return (
+				<img 
+					src={FlexiWave} 
+					alt="Flexi Wave"
+					style={{ width: '60px' }}
+					className="pointer-events-none select-none"
+				/>
+			);
+		}
 		return <div style={{ width: size, height: size, backgroundColor: color, borderRadius: 8 }}></div>;
 	};
 
@@ -107,7 +118,8 @@ function RenderObjectAppearance({ type, size, color, isSubmerged = false }) {
 						opacity: 0.4,
 						borderRadius: type === 'apple' || type === 'orange' || type === 'ball' ? '50%' : 
 									 type === 'square' ? '4px' :
-									 type === 'rock' ? '40% 50% 35% 55% / 50% 40% 60% 45%' : '8px',
+									 type === 'rock' ? '40% 50% 35% 55% / 50% 40% 60% 45%' : 
+									 type === 'flexi' ? '8px' : '8px',
 						mixBlendMode: 'multiply'
 					}}
 				/>
@@ -118,9 +130,18 @@ function RenderObjectAppearance({ type, size, color, isSubmerged = false }) {
 						background: 'linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%)',
 						borderRadius: type === 'apple' || type === 'orange' || type === 'ball' ? '50%' : 
 									 type === 'square' ? '4px' :
-									 type === 'rock' ? '40% 50% 35% 55% / 50% 40% 60% 45%' : '8px'
+									 type === 'rock' ? '40% 50% 35% 55% / 50% 40% 60% 45%' : 
+									 type === 'flexi' ? '8px' : '8px'
 					}}
 				/>
+				{/* Special bubbles effect for Flexi when submerged */}
+				{type === 'flexi' && (
+					<div className="absolute inset-0 pointer-events-none">
+						<div className="absolute top-[10%] left-[20%] w-2 h-2 bg-white rounded-full opacity-70 animate-bounce"></div>
+						<div className="absolute top-[30%] right-[15%] w-1.5 h-1.5 bg-white rounded-full opacity-60 animate-bounce" style={{ animationDelay: '0.5s' }}></div>
+						<div className="absolute top-[50%] left-[60%] w-1 h-1 bg-white rounded-full opacity-80 animate-bounce" style={{ animationDelay: '1s' }}></div>
+					</div>
+				)}
 			</div>
 		);
 	}
@@ -165,7 +186,8 @@ const WaterDisplacementV2 = () => {
 		'ball-1': { type: 'ball', volume: 15, size: 40, color: '#f59e0b', startX: '40%', startY: 190 },
 		'cube-1': { type: 'square', volume: 20, size: 45, color: '#3b82f6', startX: '10%', startY: 188 },
 		'rock-1': { type: 'rock', volume: 15, size: 55, color: '#6b7280', startX: '140%', startY: 190 },
-		'ball-2': { type: 'ball', volume: 8, size: 28, color: '#22d3ee', startX: '175%', startY: 205 }
+		'ball-2': { type: 'ball', volume: 8, size: 28, color: '#22d3ee', startX: '175%', startY: 205 },
+		'flexi-1': { type: 'flexi', volume: 30, size: 70, color: null, startX: '5%', startY: 340 }
 	};
 	const allObjectIds = Object.keys(objectCatalog);
 
@@ -270,6 +292,11 @@ const WaterDisplacementV2 = () => {
 				// Adjust height for rock (which has height = size * 0.7)
 				if (objDef?.type === 'rock') {
 					objHeight = objDef.size * 0.7;
+				}
+				
+				// Flexi uses full size for height
+				if (objDef?.type === 'flexi') {
+					objHeight = objDef.size;
 				}
 				
 				// Calculate target Y position so bottom edge aligns at 220
@@ -411,6 +438,49 @@ const WaterDisplacementV2 = () => {
 
 	return (
 		<DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+			<style>
+				{`
+					.speech-bubble {
+						position: absolute;
+						right: 1rem;
+						bottom: 4rem;
+						background: #fff;
+						border-radius: 18px;
+						padding: 7px 13px;
+						font-size: 0.95rem;
+						color: #222;
+						box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+						min-width: 160px;
+						max-width: 90vw;
+						word-break: break-word;
+						z-index: 10;
+						margin-left: 4.5rem;
+					}
+					
+					.speech-bubble:after {
+						content: '';
+						position: absolute;
+						left: -8px;
+						bottom: -7px;
+						width: 0;
+						height: 0;
+						border-top: 12px solid transparent;
+						border-bottom: 12px solid transparent;
+						border-right: 18px solid #fff;
+						filter: drop-shadow(-5px 2px 2px rgba(0,0,0,0.08));
+						transform: rotate(-34deg);
+					}
+
+					@media (max-width: 309px) {
+						.speech-bubble {
+							font-size: 0.875rem;
+							padding: 6px 10px;
+							min-width: 140px;
+							margin-left: 4.5rem;
+						}
+					}
+				`}
+			</style>
 			<Container text="Water Displacement" showResetButton={true} onReset={handleReset}>
 
 			{/* Rounded Beaker Container */}
@@ -531,10 +601,10 @@ const WaterDisplacementV2 = () => {
 					))}
 				</div>
 
-			{/* Flexi Prompt */}
-			<FlexiText text="Water Displacement">
+			<div className={`speech-bubble`}>
 				Drop objects into the tank to see how the water level changes!
-			</FlexiText>
+			</div>
+
 		</Container>
 		</DndContext>
 	)

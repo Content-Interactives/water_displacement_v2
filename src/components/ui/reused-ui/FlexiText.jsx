@@ -90,11 +90,13 @@ export function FlexiText({
             </style>
             
             <div className={`flexi-wave-bubble-container ${containerClassName} ${className || ''}`} {...props}>
-                <img 
-                    src={flexiImage} 
-                    alt={flexiAlt} 
-                    className="flexi-wave-bottom-left" 
-                />
+                {flexiImage !== "none" && (
+                    <img 
+                        src={flexiImage} 
+                        alt={flexiAlt} 
+                        className="flexi-wave-bottom-left" 
+                    />
+                )}
                 {showBubble && (
                     <div className={`speech-bubble ${bubbleClassName}`}>
                         {children}
