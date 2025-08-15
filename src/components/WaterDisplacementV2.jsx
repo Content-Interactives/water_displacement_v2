@@ -112,36 +112,62 @@ function RenderObjectAppearance({ type, size, color, isSubmerged = false }) {
 				{getBaseShape()}
 				{/* Underwater blue tint overlay */}
 				<div 
-					className="absolute inset-0 pointer-events-none"
+					className="absolute pointer-events-none"
 					style={{
-						backgroundColor: '#3b82f6',
-						opacity: 0.4,
+						backgroundColor: type === 'flexi' ? '#60a5fa' : '#3b82f6', // bg-blue-400 for flexi, bg-blue-500 for others
+						opacity: type === 'flexi' ? 0.5 : 0.4, // Higher opacity for flexi
 						borderRadius: type === 'apple' || type === 'orange' || type === 'ball' ? '50%' : 
 									 type === 'square' ? '4px' :
 									 type === 'rock' ? '40% 50% 35% 55% / 50% 40% 60% 45%' : 
 									 type === 'flexi' ? '8px' : '8px',
-						mixBlendMode: 'multiply'
+						mixBlendMode: 'multiply',
+						// Adjust dimensions and positioning for specific object types
+						...(type === 'rock' ? {
+							top: 0,
+							left: 0,
+							width: size,
+							height: size * 0.7
+						} : type === 'flexi' ? {
+							top: 0,
+							left: 0,
+							width: '60px',
+							height: '60px'
+						} : {
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0
+						})
 					}}
 				/>
 				{/* Subtle water shimmer effect */}
 				<div 
-					className="absolute inset-0 pointer-events-none"
+					className="absolute pointer-events-none"
 					style={{
 						background: 'linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.3) 50%, transparent 60%)',
 						borderRadius: type === 'apple' || type === 'orange' || type === 'ball' ? '50%' : 
 									 type === 'square' ? '4px' :
 									 type === 'rock' ? '40% 50% 35% 55% / 50% 40% 60% 45%' : 
-									 type === 'flexi' ? '8px' : '8px'
+									 type === 'flexi' ? '8px' : '8px',
+						// Adjust dimensions and positioning for specific object types
+						...(type === 'rock' ? {
+							top: 0,
+							left: 0,
+							width: size,
+							height: size * 0.7
+						} : type === 'flexi' ? {
+							top: 0,
+							left: 0,
+							width: '60px',
+							height: '60px'
+						} : {
+							top: 0,
+							left: 0,
+							right: 0,
+							bottom: 0
+						})
 					}}
 				/>
-				{/* Special bubbles effect for Flexi when submerged */}
-				{type === 'flexi' && (
-					<div className="absolute inset-0 pointer-events-none">
-						<div className="absolute top-[10%] left-[20%] w-2 h-2 bg-white rounded-full opacity-70 animate-bounce"></div>
-						<div className="absolute top-[30%] right-[15%] w-1.5 h-1.5 bg-white rounded-full opacity-60 animate-bounce" style={{ animationDelay: '0.5s' }}></div>
-						<div className="absolute top-[50%] left-[60%] w-1 h-1 bg-white rounded-full opacity-80 animate-bounce" style={{ animationDelay: '1s' }}></div>
-					</div>
-				)}
 			</div>
 		);
 	}
@@ -199,6 +225,7 @@ const WaterDisplacementV2 = () => {
 	// Refs to latest water values for physics loop
 	const waterBodyPositionRef = useRef(waterBodyPosition);
 	useEffect(() => { waterBodyPositionRef.current = waterBodyPosition; }, [waterBodyPosition]);
+	const updateFramesRef = useRef(0); // Counter for additional frames after water level changes
 
 	// DnD and physics state
 	const sensors = useSensors(
@@ -246,11 +273,19 @@ const WaterDisplacementV2 = () => {
 			const restOffsetPx = 5; // raise resting position by ~5px
 
 			let anyFalling = false;
+			let waterLevelChanged = false;
 			
 			// Handle objects falling into beaker
 			const curr = objectsRef.current;
 			const next = curr.map(o => {
-				if (o.state !== 'falling') return o;
+				// Calculate current water surface position for all objects
+				const currentWaterSurfaceY = beakerHeight - bottomOffsetPx - (waterBodyPositionRef.current || 0);
+				
+				if (o.state !== 'falling') {
+					// Update isSubmerged status for resting objects when water level changes
+					const isSubmerged = (o.y + o.size) >= currentWaterSurfaceY;
+					return { ...o, isSubmerged };
+				}
 				anyFalling = true;
 				let vy = o.vy + gravity;
 				let y = o.y + vy;
@@ -263,15 +298,34 @@ const WaterDisplacementV2 = () => {
 					setWaterTopPosition(prev => prev + pixelDisplacement);
 					setWaterBodyPosition(prev => Math.max(0, prev + pixelDisplacement));
 					o.displaced = true;
+					
+					// Update water surface position immediately after displacement for accurate isSubmerged calculation
+					const newWaterBodyPosition = Math.max(0, (waterBodyPositionRef.current || 0) + pixelDisplacement);
+					waterBodyPositionRef.current = newWaterBodyPosition;
+					
+					// Mark object as immediately submerged when it enters water
+					o.isSubmerged = true;
+					waterLevelChanged = true; // Indicate water level changed
+					updateFramesRef.current = 3; // Continue animation for 3 more frames
 				}
 				// Rest all objects at the same bottom level (no stacking), raised slightly
-				const groundY = beakerHeight - restOffsetPx - o.size;
+				// Use different rest offset for flexi and rock to make them sit lower
+				const objDef = objectCatalog[o.id];
+				const adjustedRestOffset = objDef?.type === 'flexi' ? -5 : 
+										  objDef?.type === 'rock' ? -8 : 
+										  restOffsetPx; // Flexi rests 10px lower, rock rests 8px lower
+				const groundY = beakerHeight - adjustedRestOffset - o.size;
+				
+				// Calculate if object is submerged (using updated water level)
+				const updatedWaterSurfaceY = beakerHeight - bottomOffsetPx - (waterBodyPositionRef.current || 0);
+				const isSubmerged = (y + o.size) >= updatedWaterSurfaceY;
+				
 				if (y >= groundY) {
 					y = groundY;
 					vy = 0;
-					return { ...o, y, vy, state: 'rest' };
+					return { ...o, y, vy, state: 'rest', isSubmerged: (y + o.size) >= updatedWaterSurfaceY };
 				}
-				return { ...o, y, vy };
+				return { ...o, y, vy, isSubmerged };
 			});
 
 			setObjectsInBeaker(next);
@@ -324,7 +378,12 @@ const WaterDisplacementV2 = () => {
 			setFallingToShelf(nextShelf);
 			fallingToShelfRef.current = nextShelf;
 			
-			if (anyFalling) {
+			// Decrement update counter
+			if (updateFramesRef.current > 0) {
+				updateFramesRef.current--;
+			}
+			
+			if (anyFalling || waterLevelChanged || updateFramesRef.current > 0) {
 				animRef.current = requestAnimationFrame(tick);
 			} else {
 				animRef.current = null;
@@ -368,7 +427,7 @@ const WaterDisplacementV2 = () => {
 			// Center X by default
 			const bw = (beakerRef.current?.clientWidth || 108);
 			const x = (bw - def.size) / 2;
-			setObjectsInBeaker(prev => [...prev, { id: active.id, x, y: -def.size, size: def.size, volume: def.volume, vy: 0, displaced: false, state: 'falling' }]);
+			setObjectsInBeaker(prev => [...prev, { id: active.id, x, y: -def.size, size: def.size, volume: def.volume, vy: 0, displaced: false, state: 'falling', isSubmerged: false }]);
 			startAnimation();
 			return;
 		}
@@ -390,7 +449,7 @@ const WaterDisplacementV2 = () => {
 				// Compute local X inside beaker coordinates and clamp
 				const bw = (beakerRef.current.clientWidth || 108);
 				const localX = Math.max(0, Math.min((centerX - beakerRect.left) - (def.size / 2), bw - def.size));
-				setObjectsInBeaker(prev => [...prev, { id: active.id, x: localX, y: -def.size, size: def.size, volume: def.volume, vy: 0, displaced: false, state: 'falling' }]);
+				setObjectsInBeaker(prev => [...prev, { id: active.id, x: localX, y: -def.size, size: def.size, volume: def.volume, vy: 0, displaced: false, state: 'falling', isSubmerged: false }]);
 				startAnimation();
 				return;
 			}
@@ -398,7 +457,8 @@ const WaterDisplacementV2 = () => {
 		
 		// If not dropped over beaker and object was moved significantly, make it fall to Y=220
 		if (delta && (Math.abs(delta.x) > 5 || Math.abs(delta.y) > 5)) {
-			const targetY = 233; // Fixed target Y position for all objects (lowered from 190)
+			// Use original Y position for flexi, fixed position for others
+			const targetY = def.type === 'flexi' ? 410 : 233;
 			
 			if (isDisplacedObject) {
 				setDisplacedObjects(prev => prev.filter(obj => obj.id !== active.id));
@@ -412,7 +472,7 @@ const WaterDisplacementV2 = () => {
 					leftValue: startX,
 					deltaX: (displacedObj.deltaX || 0) + (delta?.x || 0),  // Combine existing offset with new drag
 					y: droppedY,
-					targetY: targetY, // Fall to Y=220
+					targetY: targetY, // Fall to original Y for flexi, Y=233 for others
 					vy: 0, 
 					state: 'falling' 
 				}]);
@@ -427,7 +487,7 @@ const WaterDisplacementV2 = () => {
 					leftValue: leftValue, // Keep original X positioning (percentage-based)
 					deltaX: delta?.x || 0,  // Add the X offset from dragging
 					y: droppedY,  // Start falling from where it was dropped
-					targetY: targetY, // Fall to Y=220 instead of original position
+					targetY: targetY, // Fall to original Y for flexi, Y=233 for others
 					vy: 0, 
 					state: 'falling' 
 				}]);
@@ -453,24 +513,10 @@ const WaterDisplacementV2 = () => {
 						min-width: 160px;
 						max-width: 90vw;
 						word-break: break-word;
-						z-index: 10;
+						z-index: 0;
 						margin-left: 4.5rem;
 					}
-					
-					.speech-bubble:after {
-						content: '';
-						position: absolute;
-						left: -8px;
-						bottom: -7px;
-						width: 0;
-						height: 0;
-						border-top: 12px solid transparent;
-						border-bottom: 12px solid transparent;
-						border-right: 18px solid #fff;
-						filter: drop-shadow(-5px 2px 2px rgba(0,0,0,0.08));
-						transform: rotate(-34deg);
-					}
-
+				
 					@media (max-width: 309px) {
 						.speech-bubble {
 							font-size: 0.875rem;
@@ -542,19 +588,14 @@ const WaterDisplacementV2 = () => {
 						</div>
 						{/* All objects inside beaker */}
 						{objectsInBeaker.map(o => {
-							// Calculate if object is submerged (below water surface)
-							const beakerHeight = beakerRef.current?.clientHeight || 156;
-							const bottomOffsetPx = beakerHeight * 0.145; // bottom-[14.5%]
-							const waterSurfaceY = beakerHeight - bottomOffsetPx - (waterBodyPosition || 0);
-							const isSubmerged = o.y >= waterSurfaceY;
-							
+							// Use stored isSubmerged value from physics update instead of calculating here
 							return (
 								<div key={o.id} className="absolute z-[5]" style={{ top: o.y, left: o.x }}>
 									<RenderObjectAppearance 
 										type={objectCatalog[o.id]?.type} 
 										size={o.size} 
 										color={objectCatalog[o.id]?.color}
-										isSubmerged={isSubmerged}
+										isSubmerged={o.isSubmerged || false}
 									/>
 								</div>
 							);
